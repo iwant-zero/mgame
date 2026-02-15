@@ -1,59 +1,207 @@
-// --- 상점 및 가방 UI 기능 (이 부분만 교체하거나 전체 코드를 참고하세요) ---
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>100층 던전: 푸른 마력의 잔상</title>
+    <style>
+        body { margin: 0; background: #000; color: #fff; overflow: hidden; font-family: 'Malgun Gothic', sans-serif; }
+        canvas { display: block; background: #000; }
+        #ui-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .hud { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.85); padding: 12px; border-radius: 8px; border: 2px solid #00aaff; pointer-events: auto; min-width: 150px; }
+        .skill-bar { margin: 8px 0; height: 8px; background: #333; border-radius: 4px; overflow: hidden; }
+        #skill-fill { width: 0%; height: 100%; background: #00aaff; }
+        .btn-group { display: flex; gap: 5px; margin-top: 10px; }
+        .shop-btn { background: #222; color: #00aaff; border: 1px solid #00aaff; padding: 5px 8px; cursor: pointer; font-weight: bold; font-size: 12px; }
+        #modal { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #111; padding: 20px; border: 2px solid #00aaff; border-radius: 10px; pointer-events: auto; min-width: 250px; z-index: 100; text-align: center; }
+        .item-row { display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center; background: #1a1a1a; padding: 8px; border-radius: 4px; }
+        #virtual-pad { position: absolute; bottom: 20px; left: 20px; display: none; pointer-events: auto; }
+        .pad-row { display: flex; justify-content: center; }
+        .pad-btn { width: 55px; height: 55px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); border-radius: 10px; margin: 2px; text-align: center; line-height: 55px; font-size: 20px; user-select: none; }
+        @media (max-width: 768px) { #virtual-pad { display: flex; align-items: flex-end; } }
+    </style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<div id="ui-container">
+    <div class="hud">
+        <div style="font-weight: bold; color: #00aaff;">[ <span id="cur-floor">1</span>F ] <span id="theme-name">철의 던전</span></div>
+        <div style="margin-top: 5px;">HP: <span id="hp">100</span> / <span id="maxHp">100</span></div>
+        <div>GOLD: <span id="gold">50</span>G</div>
+        <div class="skill-bar"><div id="skill-fill"></div></div>
+        <div class="btn-group">
+            <button class="shop-btn" onclick="toggleModal('inventory')">가방</button>
+            <button class="shop-btn" onclick="toggleModal('shop')">상점</button>
+        </div>
+        <div id="msg" style="color: #ffff00; font-size: 11px; margin-top: 8px; font-weight: bold;"></div>
+    </div>
+
+    <div id="modal">
+        <div id="modal-content"></div>
+        <button class="shop-btn" style="width:100%; margin-top:10px;" onclick="closeModal()">닫기</button>
+    </div>
+</div>
+
+<div id="virtual-pad">
+    <div>
+        <div class="pad-row"><div class="pad-btn" id="btn-up">▲</div></div>
+        <div class="pad-row"><div class="pad-btn" id="btn-left">◀</div><div class="pad-btn" id="btn-down">▼</div><div class="pad-btn" id="btn-right">▶</div></div>
+    </div>
+    <div class="pad-btn" style="border-radius:50%; width:65px; height:65px; margin-left:10px;" id="btn-skill">스킬</div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const MAP_SIZE = 15;
+let TILE_SIZE = 40;
+
+let player = { x: 1, y: 1, hp: 100, maxHp: 100, gold: 50, atk: 15, weaponLvl: 0, potions: 3, lastSkill: 0 };
+let gameState = { floor: 1, map: [], monsters: [], items: [], portal: null, isBossClear: false, theme: {wall: "#444", floor: "#111"} };
+
+const THEMES = [
+    { name: "철의 던전", wall: "#444", floor: "#111" },
+    { name: "이끼 동굴", wall: "#2a4d2e", floor: "#0a1a0d" },
+    { name: "용암 구덩이", wall: "#632111", floor: "#1a0804" }
+];
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const minSide = Math.min(canvas.width, canvas.height);
+    TILE_SIZE = Math.floor(minSide / (MAP_SIZE + 2));
+}
+
+function initMap(floor) {
+    gameState.floor = floor;
+    gameState.theme = THEMES[Math.floor((floor-1)/5) % THEMES.length];
+    document.getElementById('theme-name').innerText = gameState.theme.name;
+    gameState.map = Array.from({length: MAP_SIZE}, () => Array(MAP_SIZE).fill(1));
+    
+    // 길 생성 (연결 보장)
+    let cx = 1, cy = 1;
+    gameState.map[cy][cx] = 0;
+    for(let i=0; i<200; i++) {
+        let dir = Math.floor(Math.random()*4);
+        let dx = [0,0,-1,1][dir], dy = [-1,1,0,0][dir];
+        if(cx+dx>0 && cx+dx<MAP_SIZE-1 && cy+dy>0 && cy+dy<MAP_SIZE-1) {
+            cx += dx; cy += dy; gameState.map[cy][cx] = 0;
+        }
+    }
+    player.x = 1; player.y = 1;
+    gameState.monsters = []; gameState.items = []; gameState.portal = null; gameState.isBossClear = false;
+    for(let i=0; i<4+Math.floor(floor/3); i++) spawnEntity('monster');
+    updateUI();
+}
+
+function spawnEntity(type) {
+    while(true) {
+        let rx = Math.floor(Math.random()*MAP_SIZE), ry = Math.floor(Math.random()*MAP_SIZE);
+        if(gameState.map[ry][rx] === 0 && (rx!==1 || ry!==1)) {
+            if(type === 'monster') gameState.monsters.push({x:rx, y:ry, hp:30+gameState.floor*10, maxHp:30+gameState.floor*10, isBoss:false});
+            else if(type === 'boss') gameState.monsters.push({x:rx, y:ry, hp:150+gameState.floor*40, maxHp:150+gameState.floor*40, isBoss:true});
+            break;
+        }
+    }
+}
+
+function draw() {
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const ox = (canvas.width - MAP_SIZE*TILE_SIZE)/2, oy = (canvas.height - MAP_SIZE*TILE_SIZE)/2;
+
+    for(let y=0; y<MAP_SIZE; y++) {
+        for(let x=0; x<MAP_SIZE; x++) {
+            ctx.fillStyle = gameState.map[y][x] === 1 ? gameState.theme.wall : gameState.theme.floor;
+            ctx.fillRect(x*TILE_SIZE+ox, y*TILE_SIZE+oy, TILE_SIZE-1, TILE_SIZE-1);
+        }
+    }
+
+    if(gameState.portal) {
+        ctx.fillStyle = "#00ffcc";
+        ctx.fillRect(gameState.portal.x*TILE_SIZE+ox+4, gameState.portal.y*TILE_SIZE+oy+4, TILE_SIZE-8, TILE_SIZE-8);
+    }
+
+    gameState.items.forEach(it => {
+        ctx.fillStyle = it.type === 'gold' ? 'gold' : '#ff00ff';
+        ctx.beginPath(); ctx.arc(it.x*TILE_SIZE+ox+TILE_SIZE/2, it.y*TILE_SIZE+oy+TILE_SIZE/2, TILE_SIZE/5, 0, Math.PI*2); ctx.fill();
+    });
+
+    gameState.monsters.forEach(m => {
+        ctx.fillStyle = m.isBoss ? '#f0f' : '#f44';
+        ctx.fillRect(m.x*TILE_SIZE+ox+TILE_SIZE*0.2, m.y*TILE_SIZE+oy+TILE_SIZE*0.2, TILE_SIZE*0.6, TILE_SIZE*0.6);
+    });
+
+    ctx.fillStyle = '#00aaff'; ctx.fillRect(player.x*TILE_SIZE+ox+TILE_SIZE*0.2, player.y*TILE_SIZE+oy+TILE_SIZE*0.2, TILE_SIZE*0.6, TILE_SIZE*0.6);
+    
+    let sp = Math.min(100, ((Date.now() - player.lastSkill)/5000)*100);
+    document.getElementById('skill-fill').style.width = sp + "%";
+    requestAnimationFrame(draw);
+}
+
+function move(dx, dy) {
+    let nx = player.x+dx, ny = player.y+dy;
+    if(nx<0||nx>=MAP_SIZE||ny<0||ny>=MAP_SIZE||gameState.map[ny][nx]===1) return;
+
+    let mIdx = gameState.monsters.findIndex(m => m.x===nx && m.y===ny);
+    if(mIdx > -1) {
+        let m = gameState.monsters[mIdx];
+        m.hp -= (player.atk + player.weaponLvl*10);
+        if(m.hp <= 0) {
+            gameState.items.push({x:m.x, y:m.y, type:Math.random()<0.2?'potion':'gold', amount:20+gameState.floor*5});
+            if(m.isBoss) { gameState.isBossClear=true; gameState.portal={x:m.x, y:m.y}; }
+            gameState.monsters.splice(mIdx, 1);
+            if(gameState.monsters.length===0 && !gameState.isBossClear) spawnEntity('boss');
+        } else { player.hp -= (5+gameState.floor); }
+    } else {
+        player.x = nx; player.y = ny;
+        gameState.items = gameState.items.filter(it => {
+            if(it.x===player.x && it.y===player.y) { if(it.type==='gold') player.gold+=it.amount; else player.potions++; return false; }
+            return true;
+        });
+        if(gameState.portal && player.x===gameState.portal.x && player.y===gameState.portal.y) initMap(gameState.floor+1);
+    }
+    if(player.hp<=0) { alert("사망!"); location.reload(); }
+    updateUI();
+}
+
+function updateUI() {
+    document.getElementById('cur-floor').innerText = gameState.floor;
+    document.getElementById('hp').innerText = player.hp;
+    document.getElementById('maxHp').innerText = player.maxHp;
+    document.getElementById('gold').innerText = player.gold;
+}
+
 function toggleModal(type) {
     const m = document.getElementById('modal'), c = document.getElementById('modal-content');
     m.style.display = 'block';
-    
     if(type === 'inventory') {
-        // 가방: 물약 개수 확인 및 사용
-        c.innerHTML = `
-            <h2 style="color:#00aaff">가방</h2>
-            <div class="item-row" style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                <span>보유 물약: ${player.potions}개</span>
-                <button class="shop-btn" onclick="usePotion()">마시기</button>
-            </div>
-            <p style="font-size:11px; color:#aaa;">물약 사용 시 HP가 50 회복됩니다.</p>
-        `;
+        c.innerHTML = `<h3>가방</h3><div class="item-row">포션: ${player.potions}개 <button class="shop-btn" onclick="usePotion()">사용</button></div>`;
     } else {
-        // 상점: 물약 구매 및 무기 강화
-        let upgradeCost = (player.weaponLvl + 1) * 100;
-        c.innerHTML = `
-            <h2 style="color:#00aaff">던전 상점</h2>
-            <div class="item-row" style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                <span>체력 물약 (30G)</span>
-                <button class="shop-btn" onclick="buyPotion()">구매</button>
-            </div>
-            <div class="item-row" style="display:flex; justify-content:space-between;">
-                <span>무기 강화 (${upgradeCost}G)</span>
-                <button class="shop-btn" onclick="buyUpgrade()">강화</button>
-            </div>
-        `;
+        c.innerHTML = `<h3>상점</h3>
+            <div class="item-row">포션 (30G) <button class="shop-btn" onclick="buyPotion()">구매</button></div>
+            <div class="item-row">강화 (${(player.weaponLvl+1)*100}G) <button class="shop-btn" onclick="buyUpgrade()">강화</button></div>`;
     }
 }
-
-// 물약 구매 함수
-function buyPotion() {
-    if (player.gold >= 30) {
-        player.gold -= 30;
-        player.potions++;
-        updateUI();
-        document.getElementById('msg').innerText = "물약을 구매했습니다.";
-        toggleModal('shop'); // 상점 UI 갱신
-    } else {
-        document.getElementById('msg').innerText = "골드가 부족합니다!";
-    }
-}
-
-// 무기 강화 함수
+function closeModal() { document.getElementById('modal').style.display = 'none'; }
+function usePotion() { if(player.potions>0) { player.potions--; player.hp=Math.min(player.maxHp, player.hp+50); updateUI(); closeModal(); } }
+function buyPotion() { if(player.gold>=30) { player.gold-=30; player.potions++; updateUI(); toggleModal('shop'); } }
 function buyUpgrade() { 
-    let cost = (player.weaponLvl + 1) * 100;
-    if (player.gold >= cost) {
-        player.gold -= cost;
-        player.weaponLvl++;
-        player.atk += 5; // 공격력 증가
-        updateUI();
-        document.getElementById('msg').innerText = "무기가 강화되었습니다!";
-        toggleModal('shop');
-    } else {
-        document.getElementById('msg').innerText = "골드가 부족합니다!";
-    }
+    let cost = (player.weaponLvl+1)*100;
+    if(player.gold>=cost) { player.gold-=cost; player.weaponLvl++; updateUI(); toggleModal('shop'); }
 }
+
+window.onload = () => { resize(); initMap(1); draw(); };
+window.onresize = resize;
+window.onkeydown = (e) => {
+    if(e.key==='ArrowUp') move(0,-1); if(e.key==='ArrowDown') move(0,1);
+    if(e.key==='ArrowLeft') move(-1,0); if(e.key==='ArrowRight') move(1,0);
+};
+document.getElementById('btn-up').onclick = () => move(0,-1);
+document.getElementById('btn-down').onclick = () => move(0,1);
+document.getElementById('btn-left').onclick = () => move(-1,0);
+document.getElementById('btn-right').onclick = () => move(1,0);
+</script>
+</body>
+</html>
