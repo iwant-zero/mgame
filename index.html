@@ -3,29 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>100층 던전 공략: 푸른 마력의 잔상</title>
+    <title>100층 던전 공략: 확장판</title>
     <style>
-        body { margin: 0; background: #111; color: #fff; overflow: hidden; font-family: 'Malgun Gothic', sans-serif; }
-        canvas { display: block; background: #000; margin: 0 auto; touch-action: none; }
+        body { margin: 0; background: #000; color: #fff; overflow: hidden; font-family: 'Malgun Gothic', sans-serif; }
+        canvas { display: block; margin: 0 auto; touch-action: none; }
         
-        /* UI 스타일링 */
         #ui-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        .hud { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; border: 1px solid #444; pointer-events: auto; }
-        .shop-btn { background: #444; color: #fff; border: 1px solid #777; padding: 5px 10px; cursor: pointer; margin-top: 5px; }
-        .shop-btn:hover { background: #666; }
+        .hud { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.8); padding: 12px; border-radius: 8px; border: 2px solid #00aaff; pointer-events: auto; }
+        .skill-bar { margin-top: 10px; height: 10px; background: #333; border-radius: 5px; overflow: hidden; }
+        #skill-fill { width: 100%; height: 100%; background: #00aaff; transition: width 0.1s; }
+        
+        .shop-btn { background: #222; color: #00aaff; border: 1px solid #00aaff; padding: 5px 10px; cursor: pointer; margin-right: 5px; margin-top: 5px; font-weight: bold; }
+        .shop-btn:disabled { color: #555; border-color: #333; }
 
-        /* 인벤토리/상점 모달 */
         #modal { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                  background: rgba(20, 20, 20, 0.95); padding: 20px; border: 2px solid #00aaff; border-radius: 10px; 
-                  pointer-events: auto; min-width: 300px; max-height: 80%; overflow-y: auto; }
-        .modal-header { font-size: 20px; color: #00aaff; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 5px; }
-        .item-row { display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center; background: #222; padding: 5px; }
-        .close-btn { float: right; cursor: pointer; color: red; }
+                  background: rgba(10, 10, 10, 0.95); padding: 25px; border: 3px solid #00aaff; border-radius: 15px; 
+                  pointer-events: auto; min-width: 320px; z-index: 100; }
+        .item-row { display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center; background: #1a1a1a; padding: 8px; border-radius: 5px; }
+        .close-btn { float: right; cursor: pointer; color: #ff4444; font-weight: bold; }
 
-        /* 모바일 패드 */
-        #virtual-pad { position: absolute; bottom: 20px; left: 20px; display: none; }
-        .pad-btn { width: 60px; height: 60px; background: rgba(255,255,255,0.2); border-radius: 50%; display: inline-block; margin: 5px; text-align: center; line-height: 60px; pointer-events: auto; font-size: 24px; user-select: none; }
-        @media (max-width: 768px) { #virtual-pad { display: block; } }
+        #virtual-pad { position: absolute; bottom: 20px; left: 20px; display: none; pointer-events: auto; }
+        .pad-row { display: flex; justify-content: center; }
+        .pad-btn { width: 65px; height: 65px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 15px; margin: 3px; text-align: center; line-height: 65px; font-size: 28px; user-select: none; }
+        #btn-skill { background: rgba(0, 170, 255, 0.3); border-color: #00aaff; width: 80px; height: 80px; border-radius: 50%; margin-left: 20px; }
+        
+        @media (max-width: 768px) { #virtual-pad { display: flex; align-items: flex-end; } }
     </style>
 </head>
 <body>
@@ -34,109 +36,108 @@
 
 <div id="ui-container">
     <div class="hud">
-        <div style="font-weight: bold; color: #00aaff;">[ <span id="cur-floor">1</span>층 / 100층 ]</div>
+        <div style="font-size: 1.2em; color: #00aaff; font-weight: bold; margin-bottom: 5px;">[ <span id="cur-floor">1</span>F ] <span id="theme-name">일반 던전</span></div>
         <div>HP: <span id="hp">100</span> / <span id="maxHp">100</span></div>
-        <div>GOLD: <span id="gold">0</span>G</div>
-        <div>공격력: <span id="atk">10</span> (+<span id="bonusAtk">0</span>)</div>
-        <div>남은 적: <span id="monCount">0</span></div>
-        <button class="shop-btn" onclick="toggleModal('inventory')">인벤토리</button>
-        <button class="shop-btn" onclick="toggleModal('shop')">상점/강화소</button>
+        <div>GOLD: <span id="gold">50</span>G</div>
+        <div>ATK: <span id="atk">10</span> (+<span id="bonusAtk">0</span>)</div>
+        <div class="skill-bar"><div id="skill-fill"></div></div>
+        <div style="font-size: 10px; color: #aaa;">Skill: K-Key / 스킬 버튼</div>
+        <div style="margin-top: 10px;">
+            <button class="shop-btn" onclick="toggleModal('inventory')">가방</button>
+            <button class="shop-btn" onclick="toggleModal('shop')">상점</button>
+        </div>
+        <div id="msg" style="color: yellow; font-size: 12px; margin-top:5px;"></div>
     </div>
 
     <div id="modal">
-        <span class="close-btn" onclick="closeModal()">[닫기]</span>
+        <span class="close-btn" onclick="closeModal()">X</span>
         <div id="modal-content"></div>
     </div>
 </div>
 
 <div id="virtual-pad">
-    <div style="text-align:center"><div class="pad-btn" id="btn-up">▲</div></div>
-    <div class="pad-btn" id="btn-left">◀</div>
-    <div class="pad-btn" id="btn-down">▼</div>
-    <div class="pad-btn" id="btn-right">▶</div>
+    <div>
+        <div class="pad-row"><div class="pad-btn" id="btn-up">▲</div></div>
+        <div class="pad-row">
+            <div class="pad-btn" id="btn-left">◀</div>
+            <div class="pad-btn" id="btn-down">▼</div>
+            <div class="pad-btn" id="btn-right">▶</div>
+        </div>
+    </div>
+    <div class="pad-btn" id="btn-skill">스킬</div>
 </div>
 
 <script>
-/**
- * 100층 던전 공략 - 통합 시스템
- * 저작권: Gemini-RPG Engine
- */
-
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const TILE_SIZE = 50;
-const MAP_SIZE = 12; 
+const TILE_SIZE = 55;
+const MAP_SIZE = 12;
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-// --- 오디오 (경로 설정 시 작동) ---
-const sfxHit = new Audio(); // sfx_hit.mp3
-const bgm = new Audio(); // bgm.mp3
-
-// --- 게임 엔진 변수 ---
 let player = {
-    x: 1, y: 1, hp: 100, maxHp: 100, gold: 50, atk: 10,
-    weaponLvl: 0, potions: 3, frame: 0, dir: 0
+    x: 1, y: 1, hp: 100, maxHp: 100, gold: 50, atk: 12,
+    weaponLvl: 0, potions: 3, skillReady: 100, lastSkill: 0
 };
 
 let gameState = {
-    floor: 1,
-    map: [],
-    monsters: [],
-    items: [], // 필드 드랍 아이템
-    isBossFloor: false
+    floor: 1, map: [], monsters: [], items: [],
+    portal: null, isBossClear: false, theme: { name: "철의 던전", wall: "#444", floor: "#111" }
 };
 
-// --- 초기화: 맵 생성 ---
+// --- 테마 설정 ---
+const THEMES = [
+    { name: "철의 던전", wall: "#444", floor: "#111" },
+    { name: "푸른 이끼 동굴", wall: "#2a4d2e", floor: "#0a1a0d" },
+    { name: "용암의 구덩이", wall: "#632111", floor: "#1a0804" },
+    { name: "심연의 틈", wall: "#221133", floor: "#0a050f" },
+    { name: "황금의 성채", wall: "#665511", floor: "#1a1604" }
+];
+
+function updateTheme() {
+    const idx = Math.floor((gameState.floor - 1) / 5) % THEMES.length;
+    gameState.theme = THEMES[idx];
+    document.getElementById('theme-name').innerText = gameState.theme.name;
+}
+
+// --- 맵 초기화 ---
 function initMap(floor) {
     gameState.floor = floor;
-    gameState.map = [];
+    updateTheme();
+    gameState.map = Array.from({length: MAP_SIZE}, () => Array(MAP_SIZE).fill(0));
+    
+    // 벽 생성
     for(let y=0; y<MAP_SIZE; y++) {
-        gameState.map[y] = [];
         for(let x=0; x<MAP_SIZE; x++) {
-            // 외곽 벽 + 랜덤 벽 (층수가 높을수록 벽 확률 증가)
-            let isWall = (x===0 || x===MAP_SIZE-1 || y===0 || y===MAP_SIZE-1);
-            if(!isWall && Math.random() < 0.15 + (floor*0.002)) isWall = true;
-            gameState.map[y][x] = isWall ? 1 : 0;
+            if(x===0 || x===MAP_SIZE-1 || y===0 || y===MAP_SIZE-1 || Math.random() < 0.18) {
+                gameState.map[y][x] = 1;
+            }
         }
     }
-    gameState.map[1][1] = 0; // 시작 지점 보장
+    gameState.map[1][1] = 0;
     
-    // 몬스터 배치 (버그 수정 버전: 바닥 타일에만 배치)
+    // 몬스터 배치
     gameState.monsters = [];
-    let monsterCount = 3 + Math.floor(floor / 4);
-    for(let i=0; i<monsterCount; i++) {
-        spawnEntity('monster');
-    }
-    gameState.items = [];
-    gameState.isBossFloor = false;
+    let mCount = 4 + Math.floor(floor/3);
+    for(let i=0; i<mCount; i++) spawnEntity('monster');
     
+    gameState.items = [];
+    gameState.portal = null;
+    gameState.isBossClear = false;
+    
+    document.getElementById('msg').innerText = floor + "층 진입. 몬스터를 소탕하십시오.";
     saveGame();
     updateUI();
 }
 
-// 안전한 스폰 함수 (벽 안 갇힘 방지)
 function spawnEntity(type) {
     let rx, ry, attempts = 0;
-    while(attempts < 200) {
-        rx = Math.floor(Math.random()*MAP_SIZE);
-        ry = Math.floor(Math.random()*MAP_SIZE);
+    while(attempts < 150) {
+        rx = Math.floor(Math.random()*(MAP_SIZE-2))+1;
+        ry = Math.floor(Math.random()*(MAP_SIZE-2))+1;
         if(gameState.map[ry][rx] === 0 && (rx !== player.x || ry !== player.y)) {
             if(type === 'monster') {
-                gameState.monsters.push({
-                    x: rx, y: ry, 
-                    hp: 20 + (gameState.floor*8), 
-                    maxHp: 20 + (gameState.floor*8),
-                    isBoss: false
-                });
+                gameState.monsters.push({ x: rx, y: ry, hp: 25+(floor*7), maxHp: 25+(floor*7), isBoss: false });
             } else if(type === 'boss') {
-                gameState.monsters.push({
-                    x: rx, y: ry,
-                    hp: 100 + (gameState.floor*20),
-                    maxHp: 100 + (gameState.floor*20),
-                    isBoss: true
-                });
+                gameState.monsters.push({ x: rx, y: ry, hp: 120+(floor*25), maxHp: 120+(floor*25), isBoss: true });
             }
             return;
         }
@@ -144,214 +145,206 @@ function spawnEntity(type) {
     }
 }
 
-// --- 드랍 아이템 생성 ---
-function dropItem(x, y) {
-    const chance = Math.random();
-    let item = { x, y, type: 'gold', amount: 5 + gameState.floor };
-    if(chance < 0.2) item = { x, y, type: 'potion', amount: 1 };
-    gameState.items.push(item);
+// --- 다음 층 포탈 생성 (모서리 4곳 중 하나) ---
+function spawnPortal() {
+    const corners = [[1,1], [1, MAP_SIZE-2], [MAP_SIZE-2, 1], [MAP_SIZE-2, MAP_SIZE-2]];
+    const pos = corners[Math.floor(Math.random()*corners.length)];
+    gameState.portal = { x: pos[0], y: pos[1] };
+    gameState.map[pos[1]][pos[0]] = 0; // 포탈 자리는 무조건 길
+    document.getElementById('msg').innerText = "보스 처치! 탈출구가 열렸습니다 (모서리 확인)";
 }
 
 // --- 렌더링 ---
 function draw() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
     const camX = canvas.width/2 - player.x*TILE_SIZE;
     const camY = canvas.height/2 - player.y*TILE_SIZE;
 
-    // 맵 & 아이템
+    // 맵 그리기
     for(let y=0; y<MAP_SIZE; y++) {
         for(let x=0; x<MAP_SIZE; x++) {
             const tx = x*TILE_SIZE + camX;
             const ty = y*TILE_SIZE + camY;
             if(gameState.map[y][x] === 1) {
-                ctx.fillStyle = '#444';
+                ctx.fillStyle = gameState.theme.wall;
                 ctx.fillRect(tx, ty, TILE_SIZE-2, TILE_SIZE-2);
             } else {
-                ctx.strokeStyle = '#222';
+                ctx.fillStyle = gameState.theme.floor;
+                ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
+                ctx.strokeStyle = "#222";
                 ctx.strokeRect(tx, ty, TILE_SIZE, TILE_SIZE);
             }
         }
     }
 
-    // 아이템 그리기
+    // 포탈 그리기
+    if(gameState.portal) {
+        ctx.fillStyle = "#00ffcc";
+        ctx.shadowBlur = 15; ctx.shadowColor = "#00ffcc";
+        ctx.fillRect(gameState.portal.x*TILE_SIZE+camX+5, gameState.portal.y*TILE_SIZE+camY+5, TILE_SIZE-10, TILE_SIZE-10);
+        ctx.shadowBlur = 0;
+    }
+
+    // 아이템
     gameState.items.forEach(it => {
-        ctx.fillStyle = it.type === 'gold' ? 'yellow' : '#ff00ff';
+        ctx.fillStyle = it.type === 'gold' ? 'gold' : '#ff00ff';
         ctx.beginPath();
-        ctx.arc(it.x*TILE_SIZE + camX + TILE_SIZE/2, it.y*TILE_SIZE + camY + TILE_SIZE/2, 8, 0, Math.PI*2);
+        ctx.arc(it.x*TILE_SIZE+camX+TILE_SIZE/2, it.y*TILE_SIZE+camY+TILE_SIZE/2, 10, 0, Math.PI*2);
         ctx.fill();
     });
 
-    // 몬스터 & 체력바
+    // 몬스터
     gameState.monsters.forEach(m => {
-        const mx = m.x*TILE_SIZE + camX;
-        const my = m.y*TILE_SIZE + camY;
+        const mx = m.x*TILE_SIZE+camX;
+        const my = m.y*TILE_SIZE+camY;
         ctx.fillStyle = m.isBoss ? '#f0f' : '#f44';
-        ctx.fillRect(mx + 10, my + 10, TILE_SIZE-20, TILE_SIZE-20);
-
+        ctx.fillRect(mx+10, my+10, TILE_SIZE-20, TILE_SIZE-20);
         // 체력바
-        ctx.fillStyle = '#000'; ctx.fillRect(mx, my-10, TILE_SIZE, 6);
-        ctx.fillStyle = '#f00'; ctx.fillRect(mx, my-10, TILE_SIZE * (m.hp/m.maxHp), 6);
+        ctx.fillStyle = '#000'; ctx.fillRect(mx+5, my-5, TILE_SIZE-10, 5);
+        ctx.fillStyle = '#f00'; ctx.fillRect(mx+5, my-5, (TILE_SIZE-10)*(m.hp/m.maxHp), 5);
     });
 
-    // 플레이어 (푸른 마력의 잔상)
+    // 플레이어
     ctx.fillStyle = '#00aaff';
-    ctx.shadowBlur = 10; ctx.shadowColor = '#00aaff';
-    ctx.fillRect(player.x*TILE_SIZE + camX + 5, player.y*TILE_SIZE + camY + 5, TILE_SIZE-10, TILE_SIZE-10);
+    ctx.shadowBlur = 15; ctx.shadowColor = '#00aaff';
+    ctx.fillRect(player.x*TILE_SIZE+camX+8, player.y*TILE_SIZE+camY+8, TILE_SIZE-16, TILE_SIZE-16);
     ctx.shadowBlur = 0;
+
+    // 스킬 쿨타임 계산
+    let now = Date.now();
+    player.skillReady = Math.min(100, ((now - player.lastSkill) / 5000) * 100);
+    document.getElementById('skill-fill').style.width = player.skillReady + "%";
 
     requestAnimationFrame(draw);
 }
 
-// --- 핵심 로직: 이동 및 전투 ---
+// --- 로직 ---
 function move(dx, dy) {
     let nx = player.x + dx;
     let ny = player.y + dy;
-
     if(nx<0 || nx>=MAP_SIZE || ny<0 || ny>=MAP_SIZE || gameState.map[ny][nx] === 1) return;
 
-    // 몬스터 체크
-    let monIdx = gameState.monsters.findIndex(m => m.x === nx && m.y === ny);
-    if(monIdx > -1) {
-        combat(monIdx);
+    let mIdx = gameState.monsters.findIndex(m => m.x === nx && m.y === ny);
+    if(mIdx > -1) {
+        let dmg = player.atk + (player.weaponLvl*6);
+        gameState.monsters[mIdx].hp -= dmg;
+        if(gameState.monsters[mIdx].hp <= 0) {
+            let m = gameState.monsters[mIdx];
+            // 보스 처치 시 더 많은 아이템
+            let dropCount = m.isBoss ? 5 : 1;
+            for(let i=0; i<dropCount; i++) {
+                gameState.items.push({ x: m.x, y: m.y, type: Math.random() < 0.2 ? 'potion' : 'gold', amount: 10 + gameState.floor*2 });
+            }
+            if(m.isBoss) { gameState.isBossClear = true; spawnPortal(); }
+            gameState.monsters.splice(mIdx, 1);
+            if(gameState.monsters.length === 0 && !gameState.isBossClear) {
+                spawnEntity('boss');
+                document.getElementById('msg').innerText = "층의 수호자(Boss)가 나타났습니다!";
+            }
+        } else {
+            player.hp -= Math.floor(gameState.floor * 1.2);
+        }
     } else {
-        player.x = nx;
-        player.y = ny;
-        checkItem();
+        player.x = nx; player.y = ny;
+        // 아이템 습득
+        gameState.items = gameState.items.filter(it => {
+            if(it.x === player.x && it.y === player.y) {
+                if(it.type === 'gold') player.gold += it.amount;
+                else player.potions++;
+                return false;
+            }
+            return true;
+        });
+        // 포탈 체크
+        if(gameState.portal && player.x === gameState.portal.x && player.y === gameState.portal.y) {
+            if(confirm("다음 층으로 내려가시겠습니까?")) initMap(gameState.floor + 1);
+        }
     }
+    if(player.hp <= 0) { alert("사망!"); location.reload(); }
     updateUI();
 }
 
-function combat(idx) {
-    let m = gameState.monsters[idx];
-    let damage = player.atk + (player.weaponLvl * 5);
-    m.hp -= damage;
-    
-    // 효과음 재생 시도
-    sfxHit.play().catch(()=>{});
-
-    if(m.hp <= 0) {
-        dropItem(m.x, m.y);
-        gameState.monsters.splice(idx, 1);
-        if(gameState.monsters.length === 0 && !gameState.isBossFloor) {
-            gameState.isBossFloor = true;
-            spawnEntity('boss');
-            alert("보스가 나타났습니다!");
-        } else if(gameState.monsters.length === 0 && gameState.isBossFloor) {
-            alert(gameState.floor + "층 클리어! 다음 층으로 이동합니다.");
-            initMap(gameState.floor + 1);
-        }
-    } else {
-        // 몬스터 반격
-        player.hp -= Math.floor(gameState.floor * 1.5);
-        if(player.hp <= 0) {
-            alert("사망하셨습니다. 1층부터 다시 시작합니다.");
-            localStorage.clear();
-            location.reload();
-        }
-    }
-}
-
-function checkItem() {
-    gameState.items = gameState.items.filter(it => {
-        if(it.x === player.x && it.y === player.y) {
-            if(it.type === 'gold') player.gold += it.amount;
-            if(it.type === 'potion') player.potions += it.amount;
+function castSkill() {
+    if(player.skillReady < 100) return;
+    player.lastSkill = Date.now();
+    document.getElementById('msg').innerText = "푸른 마력의 폭발!!";
+    gameState.monsters.forEach(m => {
+        m.hp -= (player.atk * 3);
+    });
+    // 죽은 적 처리
+    gameState.monsters = gameState.monsters.filter(m => {
+        if(m.hp <= 0) {
+            gameState.items.push({ x: m.x, y: m.y, type: 'gold', amount: 10 });
+            if(m.isBoss) { gameState.isBossClear = true; spawnPortal(); }
             return false;
         }
         return true;
     });
+    if(gameState.monsters.length === 0 && !gameState.isBossClear) spawnEntity('boss');
+    updateUI();
 }
 
-// --- UI 관리 및 상점 시스템 ---
+// --- UI 및 모달 ---
 function updateUI() {
     document.getElementById('cur-floor').innerText = gameState.floor;
     document.getElementById('hp').innerText = player.hp;
     document.getElementById('maxHp').innerText = player.maxHp;
     document.getElementById('gold').innerText = player.gold;
     document.getElementById('atk').innerText = player.atk;
-    document.getElementById('bonusAtk').innerText = player.weaponLvl * 5;
-    document.getElementById('monCount').innerText = gameState.monsters.length;
+    document.getElementById('bonusAtk').innerText = player.weaponLvl * 6;
 }
 
 function toggleModal(type) {
-    const modal = document.getElementById('modal');
-    const content = document.getElementById('modal-content');
-    modal.style.display = 'block';
-    
+    const m = document.getElementById('modal');
+    const c = document.getElementById('modal-content');
+    m.style.display = 'block';
     if(type === 'inventory') {
-        content.innerHTML = `<div class="modal-header">인벤토리</div>
-            <div class="item-row"><span>물약: ${player.potions}개</span> 
-            <button onclick="usePotion()">사용 (+30HP)</button></div>
-            <div class="item-row"><span>장비: 전설의 검 +${player.weaponLvl}</span></div>`;
+        c.innerHTML = `<h3>가방</h3>
+            <div class="item-row">물약: ${player.potions}개 <button onclick="usePotion()">마시기</button></div>
+            <div class="item-row">무기: +${player.weaponLvl} 강화됨</div>`;
     } else {
-        content.innerHTML = `<div class="modal-header">상점 및 강화소</div>
-            <div class="item-row"><span>체력 물약 (20G)</span> <button onclick="buyItem('potion')">구매</button></div>
-            <div class="item-row"><span>무기 강화 (현재 +${player.weaponLvl}) <br>비용: ${(player.weaponLvl+1)*50}G</span> 
-            <button onclick="buyItem('upgrade')">강화하기</button></div>`;
+        let cost = (player.weaponLvl+1)*60;
+        c.innerHTML = `<h3>상점</h3>
+            <div class="item-row">물약 (30G) <button onclick="buy('p')">구매</button></div>
+            <div class="item-row">무기강화 (${cost}G) <button onclick="buy('u')">강화</button></div>`;
     }
 }
-
 function closeModal() { document.getElementById('modal').style.display = 'none'; }
-
 function usePotion() {
-    if(player.potions > 0 && player.hp < player.maxHp) {
-        player.potions--;
-        player.hp = Math.min(player.maxHp, player.hp + 30);
-        updateUI();
-        toggleModal('inventory');
+    if(player.potions > 0) { player.potions--; player.hp = Math.min(player.maxHp, player.hp+40); updateUI(); toggleModal('inventory'); }
+}
+function buy(t) {
+    if(t==='p' && player.gold >= 30) { player.gold -= 30; player.potions++; }
+    else if(t==='u') {
+        let cost = (player.weaponLvl+1)*60;
+        if(player.gold >= cost) { player.gold -= cost; player.weaponLvl++; }
     }
+    updateUI(); toggleModal('shop');
 }
 
-function buyItem(type) {
-    if(type === 'potion' && player.gold >= 20) {
-        player.gold -= 20; player.potions++;
-    } else if(type === 'upgrade') {
-        let cost = (player.weaponLvl + 1) * 50;
-        if(player.gold >= cost) {
-            player.gold -= cost; player.weaponLvl++;
-            alert("강화 성공! 공격력이 증가했습니다.");
-        } else { alert("골드가 부족합니다."); }
-    }
-    updateUI();
-    toggleModal('shop');
-}
-
-// --- 데이터 저장/로드 ---
-function saveGame() {
-    const data = { player, floor: gameState.floor };
-    localStorage.setItem('dungeon_save', JSON.stringify(data));
-}
-
-function loadGame() {
-    const saved = localStorage.getItem('dungeon_save');
-    if(saved) {
-        const data = JSON.parse(saved);
-        player = data.player;
-        initMap(data.floor);
-    } else {
-        initMap(1);
-    }
-}
-
-// --- 컨트롤러 설정 ---
+// --- 컨트롤러 ---
 window.addEventListener('keydown', e => {
     if(e.key === 'ArrowUp') move(0, -1);
     if(e.key === 'ArrowDown') move(0, 1);
     if(e.key === 'ArrowLeft') move(-1, 0);
     if(e.key === 'ArrowRight') move(1, 0);
+    if(e.key.toLowerCase() === 'k') castSkill();
 });
+document.getElementById('btn-up').onclick = () => move(0, -1);
+document.getElementById('btn-down').onclick = () => move(0, 1);
+document.getElementById('btn-left').onclick = () => move(-1, 0);
+document.getElementById('btn-right').onclick = () => move(1, 0);
+document.getElementById('btn-skill').onclick = () => castSkill();
 
-document.getElementById('btn-up').ontouchstart = () => move(0, -1);
-document.getElementById('btn-down').ontouchstart = () => move(0, 1);
-document.getElementById('btn-left').ontouchstart = () => move(-1, 0);
-document.getElementById('btn-right').ontouchstart = () => move(1, 0);
+function saveGame() { localStorage.setItem('dungeon_100_save', JSON.stringify({player, floor: gameState.floor})); }
+function loadGame() {
+    const s = localStorage.getItem('dungeon_100_save');
+    if(s) { const d = JSON.parse(s); player = d.player; initMap(d.floor); } else initMap(1);
+}
 
-window.onresize = () => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-};
-
-// 시작
 loadGame();
 draw();
 </script>
