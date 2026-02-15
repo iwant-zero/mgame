@@ -3,18 +3,252 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 세븐 포커</title>
-    <link rel="stylesheet" href="style.css">
+    <title>100층 던전 공략 - RPG</title>
+    <style>
+        body { margin: 0; background: #222; color: #fff; overflow: hidden; font-family: sans-serif; }
+        canvas { display: block; background: #000; margin: 0 auto; touch-action: none; }
+        #ui-layer { position: absolute; top: 10px; left: 10px; pointer-events: none; text-shadow: 2px 2px #000; }
+        .stats { font-size: 18px; line-height: 1.5; }
+        #virtual-pad { position: absolute; bottom: 20px; left: 20px; display: none; }
+        .pad-btn { width: 50px; height: 50px; background: rgba(255,255,255,0.3); border-radius: 50%; display: inline-block; margin: 5px; text-align: center; line-height: 50px; pointer-events: auto; }
+        @media (max-width: 768px) { #virtual-pad { display: block; } }
+    </style>
 </head>
 <body>
-    <div id="game-container">
-        <canvas id="gameCanvas"></canvas>
-        <div id="ui-layer">
-            <div id="hand-rank">족보: 대기 중</div>
-            <div id="msg">딜러가 패를 돌립니다.</div>
-            <button onclick="startGame()">새 게임 시작</button>
-        </div>
+
+<div id="ui-layer">
+    <div class="stats">
+        [층수: <span id="cur-floor">1</span>/100] <br>
+        [HP: <span id="hp">100</span>] [공격력: <span id="atk">10</span>] <br>
+        [남은 몬스터: <span id="monsters">0</span>] <br>
+        <span id="msg" style="color: yellow;"></span>
     </div>
-    <script src="game.js"></script>
+</div>
+
+<div id="virtual-pad">
+    <div style="text-align:center"><div class="pad-btn" id="btn-up">▲</div></div>
+    <div class="pad-btn" id="btn-left">◀</div>
+    <div class="pad-btn" id="btn-down">▼</div>
+    <div class="pad-btn" id="btn-right">▶</div>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+/**
+ * [인터넷 웹소설 집필 알고리즘 및 게임 로직 적용]
+ * 1. 캔버스 기반 렌더링
+ * 2. 스프라이트 애니메이션 구조 (player_sheet.png 대응)
+ * 3. 사운드 시스템 (Audio 객체)
+ * 4. 100층 미로 및 보스 시스템
+ */
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const TILE_SIZE = 40;
+const MAP_SIZE = 15; // 15x15 미로
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// --- 사운드 설정 ---
+const bgm = new Audio('bgm.mp3'); 
+bgm.loop = true;
+const sfxHit = new Audio('sfx_hit.mp3');
+
+// --- 이미지/스프라이트 설정 ---
+const playerImg = new Image();
+playerImg.src = 'player_sheet.png'; // 파일 없을 시 기본 도형 출력 로직 포함
+
+// --- 게임 상태 ---
+let game = {
+    floor: 1,
+    state: 'PLAY', // PLAY, BOSS, NEXT_FLOOR
+    player: {
+        x: 1, y: 1, hp: 100, maxHp: 100, atk: 10,
+        frame: 0, dir: 0, moveCount: 0
+    },
+    map: [],
+    monsters: [],
+    isBossSpawned: false
+};
+
+// --- 미로 생성 (단순화된 미로 알고리즘) ---
+function generateMap(floor) {
+    let newMap = [];
+    for(let y=0; y<MAP_SIZE; y++) {
+        newMap[y] = [];
+        for(let x=0; x<MAP_SIZE; x++) {
+            newMap[y][x] = (x===0 || x===MAP_SIZE-1 || y===0 || y===MAP_SIZE-1) ? 1 : 0;
+            // 층이 올라갈수록 장애물 증가 (난이도 조절)
+            if(Math.random() < 0.1 + (floor * 0.002)) newMap[y][x] = 1;
+        }
+    }
+    newMap[1][1] = 0; // 시작점 확보
+    return newMap;
+}
+
+// --- 몬스터 배치 ---
+function spawnMonsters(floor) {
+    let count = 3 + Math.floor(floor / 5);
+    let monsters = [];
+    for(let i=0; i<count; i++) {
+        monsters.push({
+            x: Math.floor(Math.random()*(MAP_SIZE-2))+1,
+            y: Math.floor(Math.random()*(MAP_SIZE-2))+1,
+            hp: 20 + (floor * 5),
+            isBoss: false
+        });
+    }
+    return monsters;
+}
+
+// --- 초기화 ---
+function initFloor(floor) {
+    game.floor = floor;
+    game.map = generateMap(floor);
+    game.monsters = spawnMonsters(floor);
+    game.isBossSpawned = false;
+    game.player.x = 1;
+    game.player.y = 1;
+    document.getElementById('cur-floor').innerText = floor;
+    document.getElementById('msg').innerText = floor + "층 진입! 몬스터를 소탕하세요.";
+}
+
+// --- 그리기 로직 ---
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 카메라 중심점 계산
+    const offsetX = (canvas.width / 2) - (game.player.x * TILE_SIZE);
+    const offsetY = (canvas.height / 2) - (game.player.y * TILE_SIZE);
+
+    // 맵 그리기
+    for(let y=0; y<MAP_SIZE; y++) {
+        for(let x=0; x<MAP_SIZE; x++) {
+            if(game.map[y][x] === 1) {
+                ctx.fillStyle = '#555'; // 벽
+                ctx.fillRect(x*TILE_SIZE + offsetX, y*TILE_SIZE + offsetY, TILE_SIZE-1, TILE_SIZE-1);
+            } else {
+                ctx.strokeStyle = '#222'; // 바닥선
+                ctx.strokeRect(x*TILE_SIZE + offsetX, y*TILE_SIZE + offsetY, TILE_SIZE, TILE_SIZE);
+            }
+        }
+    }
+
+    // 몬스터/보스 그리기
+    game.monsters.forEach(m => {
+        ctx.fillStyle = m.isBoss ? 'purple' : 'red';
+        ctx.beginPath();
+        ctx.arc(m.x*TILE_SIZE + offsetX + TILE_SIZE/2, m.y*TILE_SIZE + offsetY + TILE_SIZE/2, TILE_SIZE/3, 0, Math.PI*2);
+        ctx.fill();
+    });
+
+    // 플레이어 그리기 (스프라이트 애니메이션 구조)
+    if(playerImg.complete && playerImg.naturalWidth !== 0) {
+        // 이미지 로드 완료 시: 가로 4프레임, 세로 4방향 시트 가정
+        ctx.drawImage(
+            playerImg,
+            game.player.frame * 64, game.player.dir * 64, 64, 64,
+            game.player.x*TILE_SIZE + offsetX, game.player.y*TILE_SIZE + offsetY, TILE_SIZE, TILE_SIZE
+        );
+    } else {
+        // 이미지 없을 시 대체 도형: "푸른 마력의 잔상" 컨셉의 파란 사각형
+        ctx.fillStyle = '#00aaff';
+        ctx.fillRect(game.player.x*TILE_SIZE + offsetX, game.player.y*TILE_SIZE + offsetY, TILE_SIZE, TILE_SIZE);
+    }
+
+    // UI 업데이트
+    document.getElementById('hp').innerText = game.player.hp;
+    document.getElementById('monsters').innerText = game.monsters.length;
+}
+
+// --- 이동 및 전투 ---
+function movePlayer(dx, dy) {
+    let nx = game.player.x + dx;
+    let ny = game.player.y + dy;
+
+    if(nx >= 0 && nx < MAP_SIZE && ny >= 0 && ny < MAP_SIZE && game.map[ny][nx] === 0) {
+        // 몬스터 충돌 체크
+        let monsterIdx = game.monsters.findIndex(m => m.x === nx && m.y === ny);
+        if(monsterIdx > -1) {
+            attack(monsterIdx);
+        } else {
+            game.player.x = nx;
+            game.player.y = ny;
+            game.player.frame = (game.player.frame + 1) % 4; // 애니메이션 프레임 변경
+        }
+    }
+    draw();
+}
+
+function attack(idx) {
+    let m = game.monsters[idx];
+    m.hp -= game.player.atk;
+    sfxHit.play().catch(()=>{}); // 오디오 재생 (사용자 상호작용 후 가능)
+
+    if(m.hp <= 0) {
+        game.monsters.splice(idx, 1);
+        if(game.monsters.length === 0) {
+            if(!game.isBossSpawned) {
+                spawnBoss();
+            } else {
+                nextFloor();
+            }
+        }
+    } else {
+        // 반격
+        game.player.hp -= 5;
+        if(game.player.hp <= 0) {
+            alert("게임 오버! 1층부터 다시 시작합니다.");
+            game.player.hp = 100;
+            initFloor(1);
+        }
+    }
+}
+
+function spawnBoss() {
+    game.isBossSpawned = true;
+    game.monsters.push({
+        x: MAP_SIZE-2, y: MAP_SIZE-2,
+        hp: 50 + (game.floor * 10),
+        isBoss: true
+    });
+    document.getElementById('msg').innerText = "보스가 나타났습니다! (맵 우측 하단)";
+}
+
+function nextFloor() {
+    if(game.floor >= 100) {
+        alert("축하합니다! 100층을 정복하셨습니다!");
+        initFloor(1);
+    } else {
+        initFloor(game.floor + 1);
+    }
+}
+
+// --- 컨트롤러 ---
+window.addEventListener('keydown', e => {
+    bgm.play().catch(()=>{}); // 첫 키 입력 시 BGM 시작 (브라우저 정책)
+    if(e.key === 'ArrowUp') movePlayer(0, -1);
+    if(e.key === 'ArrowDown') movePlayer(0, 1);
+    if(e.key === 'ArrowLeft') movePlayer(-1, 0);
+    if(e.key === 'ArrowRight') movePlayer(1, 0);
+});
+
+// 모바일 가상 패드 이벤트
+document.getElementById('btn-up').ontouchstart = () => movePlayer(0, -1);
+document.getElementById('btn-down').ontouchstart = () => movePlayer(0, 1);
+document.getElementById('btn-left').ontouchstart = () => movePlayer(-1, 0);
+document.getElementById('btn-right').ontouchstart = () => movePlayer(1, 0);
+
+// 초기 실행
+initFloor(1);
+draw();
+window.onresize = () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    draw();
+};
+</script>
 </body>
 </html>
