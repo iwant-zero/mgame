@@ -3,15 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>모바일 포커</title>
+    <title>AI 세븐 포커</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="game-container">
         <canvas id="gameCanvas"></canvas>
         <div id="ui-layer">
-            <div id="msg">승부를 시작하세요!</div>
-            <button onclick="startGame()">새 게임</button>
+            <div id="hand-rank">족보: 대기 중</div>
+            <div id="msg">딜러가 패를 돌립니다.</div>
+            <button onclick="startGame()">새 게임 시작</button>
         </div>
     </div>
     <script src="game.js"></script>
