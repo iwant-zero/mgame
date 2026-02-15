@@ -89,16 +89,44 @@ function generateMap(floor) {
 }
 
 // --- 몬스터 배치 ---
+
+// --- [버그 수정] 안전한 몬스터 배치 함수 ---
 function spawnMonsters(floor) {
     let count = 3 + Math.floor(floor / 5);
     let monsters = [];
+    
     for(let i=0; i<count; i++) {
-        monsters.push({
-            x: Math.floor(Math.random()*(MAP_SIZE-2))+1,
-            y: Math.floor(Math.random()*(MAP_SIZE-2))+1,
-            hp: 20 + (floor * 5),
-            isBoss: false
-        });
+        let spawnX, spawnY;
+        let isSafe = false;
+        let attempts = 0;
+
+        // 벽이 아닌 곳을 찾을 때까지 최대 100번 시도
+        while(!isSafe && attempts < 100) {
+            spawnX = Math.floor(Math.random() * (MAP_SIZE - 2)) + 1;
+            spawnY = Math.floor(Math.random() * (MAP_SIZE - 2)) + 1;
+
+            // 1. 해당 좌표가 벽(1)이 아닐 것
+            // 2. 플레이어 시작 위치(1,1)와 너무 가깝지 않을 것
+            // 3. 이미 배치된 다른 몬스터와 겹치지 않을 것
+            const isWall = game.map[spawnY][spawnX] === 1;
+            const isNearPlayer = (spawnX === 1 && spawnY === 1);
+            const isOccupied = monsters.some(m => m.x === spawnX && m.y === spawnY);
+
+            if(!isWall && !isNearPlayer && !isOccupied) {
+                isSafe = true;
+            }
+            attempts++;
+        }
+
+        if(isSafe) {
+            monsters.push({
+                x: spawnX,
+                y: spawnY,
+                hp: 20 + (floor * 5),
+                maxHp: 20 + (floor * 5), // 체력바 표시용 추가
+                isBoss: false
+            });
+        }
     }
     return monsters;
 }
