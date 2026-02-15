@@ -1,150 +1,92 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// 설정값
-const CARD_W = 60;
-const CARD_H = 90;
-const PADDING = 10;
+let deck = [];
+let playerHand = [];
+let dealerHand = [];
 
-let gameState = {
-    deck: [],
-    opponentHand: [], // 상대방 패
-    myHand: [],       // 내 패
-    floorCards: [],   // 바닥 패
-    turn: 'player'
-};
-
-function init() {
-    window.addEventListener('resize', resize);
-    resize();
-    setupGame();
-    animate();
-}
-
+// 화면 크기 반응형 대응
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     render();
 }
+window.addEventListener('resize', resize);
 
-// 1. 게임 셋팅 (패 섞기 및 분배)
-function setupGame() {
-    // 12달 x 4장 = 48장 생성
-    let tempDeck = [];
-    for (let m = 1; m <= 12; m++) {
-        for (let i = 0; i < 4; i++) {
-            tempDeck.push({ month: m, id: i });
+// 카드 덱 생성
+function createDeck() {
+    const suits = ['♠', '♥', '♦', '♣'];
+    const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    let newDeck = [];
+    for (let s of suits) {
+        for (let r of ranks) {
+            newDeck.push({ suit: s, rank: r, color: (s === '♥' || s === '♦') ? '#e53935' : '#212121' });
         }
     }
-    // 셔플
-    gameState.deck = tempDeck.sort(() => Math.random() - 0.5);
-
-    // 신맞고 기본 분배: 상대 10장, 나 10장, 바닥 8장
-    gameState.opponentHand = gameState.deck.splice(0, 10);
-    gameState.myHand = gameState.deck.splice(0, 10);
-    gameState.floorCards = gameState.deck.splice(0, 8);
+    return newDeck.sort(() => Math.random() - 0.5);
 }
 
-// 2. 그리기 로직 (상/중/하 배치)
-function render() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-
-    // [상단] 상대방 패 (뒷면 처리)
-    gameState.opponentHand.forEach((card, i) => {
-        drawCard(centerX - (5 * (CARD_W/2)) + (i * 30), 50, "B", false);
-    });
-
-    // [중앙] 바닥 패 (2줄 배열)
-    gameState.floorCards.forEach((card, i) => {
-        const row = Math.floor(i / 4);
-        const col = i % 4;
-        drawCard(centerX - (2 * CARD_W) + (col * (CARD_W + 10)), centerY - 50 + (row * (CARD_H + 10)), card.month, true);
-    });
-
-    // [하단] 내 패
-    gameState.myHand.forEach((card, i) => {
-        const startX = centerX - (5 * (CARD_W + 5));
-        drawCard(startX + (i * (CARD_W + 5)), canvas.height - 130, card.month, true, true);
-    });
-
-    // 중앙 덱 (남은 패)
-    if(gameState.deck.length > 0) {
-        drawCard(centerX + 150, centerY - 45, "Deck", false);
-    }
+// 게임 시작
+function startGame() {
+    deck = createDeck();
+    playerHand = deck.splice(0, 7); // 7장 분배
+    dealerHand = deck.splice(0, 7);
+    render();
 }
 
-// 카드 그리기 공통 함수
-function drawCard(x, y, label, isFaceUp, isMine = false) {
-    // 카드 그림자 및 몸체
-    ctx.fillStyle = isFaceUp ? "#fff" : "#c62828"; // 앞면 흰색, 뒷면 빨간색
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 2;
+// 카드 그리기 (도형 렌더링)
+function drawCard(card, x, y, isHidden = false) {
+    const w = 60;
+    const h = 85;
+
+    // 카드 그림자
+    ctx.shadowBlur = 5;
+    ctx.shadowColor = "rgba(0,0,0,0.3)";
     
-    // 라운드 사각형 효과
-    roundRect(ctx, x, y, CARD_W, CARD_H, 5, true, true);
+    // 카드 몸체
+    ctx.fillStyle = isHidden ? "#c62828" : "white";
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 8);
+    ctx.fill();
+    ctx.shadowBlur = 0; // 그림자 초기화
 
-    if (isFaceUp) {
-        ctx.fillStyle = "#000";
+    if (!isHidden) {
+        ctx.fillStyle = card.color;
+        ctx.font = "bold 16px Arial";
+        ctx.fillText(card.suit, x + 5, y + 20);
         ctx.font = "bold 20px Arial";
         ctx.textAlign = "center";
-        ctx.fillText(label + "월", x + CARD_W/2, y + CARD_H/2 + 7);
-        
-        // 내 패일 경우 '푸른 마력의 잔상' 테두리 효과
-        if (isMine) {
-            ctx.strokeStyle = "cyan";
-            ctx.lineWidth = 3;
-            ctx.strokeRect(x - 2, y - 2, CARD_W + 4, CARD_H + 4);
-        }
+        ctx.fillText(card.rank, x + w/2, y + h/2 + 7);
     } else {
-        // 뒷면 무늬 (간단히)
-        ctx.strokeStyle = "#ffffff55";
-        ctx.strokeRect(x + 5, y + 5, CARD_W - 10, CARD_H - 10);
+        // 카드 뒷면 무늬
+        ctx.strokeStyle = "rgba(255,255,255,0.3)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 5, y + 5, w - 10, h - 10);
     }
 }
 
-// 캔버스 라운드 사각형 유틸리티
-function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
-    ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + width - radius, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    ctx.lineTo(x + width, y + height - radius);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    ctx.lineTo(x + radius, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
-    ctx.closePath();
-    if (fill) ctx.fill();
-    if (stroke) ctx.stroke();
-}
-
-function animate() {
-    render();
-    requestAnimationFrame(animate);
-}
-
-// 클릭 이벤트 - 내 패 내기
-canvas.addEventListener('mousedown', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
+function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     const centerX = canvas.width / 2;
-    const startX = centerX - (5 * (CARD_W + 5));
 
-    if (y > canvas.height - 130) {
-        const idx = Math.floor((x - startX) / (CARD_W + 5));
-        if (idx >= 0 && idx < gameState.myHand.length) {
-            const played = gameState.myHand.splice(idx, 1)[0];
-            // 바닥 패로 이동 로직 (간소화)
-            gameState.floorCards.push(played);
-            console.log(played.month + "월을 냈습니다.");
-        }
-    }
-});
+    // 딜러 패 (상단)
+    dealerHand.forEach((card, i) => {
+        // 처음 2장과 마지막 1장은 숨김 (포커 룰 적용 예시)
+        const hidden = (i < 2 || i === 6);
+        drawCard(card, (centerX - 210) + (i * 65), 80, hidden);
+    });
 
-init();
+    // 플레이어 패 (하단)
+    playerHand.forEach((card, i) => {
+        drawCard(card, (centerX - 210) + (i * 65), canvas.height - 200, false);
+    });
+
+    // 텍스트 안내
+    ctx.fillStyle = "white";
+    ctx.font = "16px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("DEALER", centerX, 60);
+    ctx.fillText("PLAYER", centerX, canvas.height - 220);
+}
+
+resize(); // 초기 실행
