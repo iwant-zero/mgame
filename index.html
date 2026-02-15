@@ -3,28 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>100층 던전 공략: 확장판 (Fix)</title>
+    <title>100층 던전 공략: 버그 수정판</title>
     <style>
         body { margin: 0; background: #000; color: #fff; overflow: hidden; font-family: 'Malgun Gothic', sans-serif; }
         canvas { display: block; background: #000; touch-action: none; }
-        
         #ui-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        .hud { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.85); padding: 12px; border-radius: 8px; border: 2px solid #00aaff; pointer-events: auto; min-width: 150px; }
+        .hud { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.85); padding: 12px; border-radius: 8px; border: 2px solid #00aaff; pointer-events: auto; min-width: 160px; }
         .skill-bar { margin-top: 10px; height: 10px; background: #333; border-radius: 5px; overflow: hidden; }
         #skill-fill { width: 100%; height: 100%; background: #00aaff; transition: width 0.1s; }
-        
-        .shop-btn { background: #222; color: #00aaff; border: 1px solid #00aaff; padding: 5px 10px; cursor: pointer; margin-right: 5px; margin-top: 5px; font-weight: bold; }
+        .shop-btn { background: #222; color: #00aaff; border: 1px solid #00aaff; padding: 5px 10px; cursor: pointer; margin-top: 5px; font-weight: bold; font-size: 12px; }
         #modal { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
                   background: rgba(10, 10, 10, 0.98); padding: 25px; border: 3px solid #00aaff; border-radius: 15px; 
-                  pointer-events: auto; min-width: 300px; z-index: 100; box-shadow: 0 0 20px #00aaff; }
+                  pointer-events: auto; min-width: 280px; z-index: 100; box-shadow: 0 0 20px #00aaff; }
         .item-row { display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center; background: #1a1a1a; padding: 8px; border-radius: 5px; }
         .close-btn { float: right; cursor: pointer; color: #ff4444; font-weight: bold; font-size: 20px; }
-
         #virtual-pad { position: absolute; bottom: 20px; left: 20px; display: none; pointer-events: auto; }
         .pad-row { display: flex; justify-content: center; }
         .pad-btn { width: 60px; height: 60px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 15px; margin: 3px; text-align: center; line-height: 60px; font-size: 24px; user-select: none; }
-        #btn-skill { background: rgba(0, 170, 255, 0.4); border: 2px solid #00aaff; width: 70px; height: 70px; border-radius: 50%; margin-left: 15px; font-size: 16px; font-weight: bold; }
-        
+        #btn-skill { background: rgba(0, 170, 255, 0.4); border: 2px solid #00aaff; width: 70px; height: 70px; border-radius: 50%; margin-left: 15px; font-size: 14px; font-weight: bold; }
         @media (max-width: 768px) { #virtual-pad { display: flex; align-items: flex-end; } }
     </style>
 </head>
@@ -39,14 +35,12 @@
         <div>GOLD: <span id="gold">50</span>G</div>
         <div>공격: <span id="atk">12</span> (+<span id="bonusAtk">0</span>)</div>
         <div class="skill-bar"><div id="skill-fill"></div></div>
-        <div style="font-size: 11px; color: #00aaff; margin-top:2px;">K-Key: 광역 스킬</div>
         <div style="margin-top: 8px;">
             <button class="shop-btn" onclick="toggleModal('inventory')">가방</button>
             <button class="shop-btn" onclick="toggleModal('shop')">상점</button>
         </div>
-        <div id="msg" style="color: yellow; font-size: 12px; margin-top:8px; font-weight:bold;"></div>
+        <div id="msg" style="color: yellow; font-size: 11px; margin-top:8px; font-weight:bold;"></div>
     </div>
-
     <div id="modal">
         <span class="close-btn" onclick="closeModal()">×</span>
         <div id="modal-content"></div>
@@ -56,32 +50,19 @@
 <div id="virtual-pad">
     <div>
         <div class="pad-row"><div class="pad-btn" id="btn-up">▲</div></div>
-        <div class="pad-row">
-            <div class="pad-btn" id="btn-left">◀</div>
-            <div class="pad-btn" id="btn-down">▼</div>
-            <div class="pad-btn" id="btn-right">▶</div>
-        </div>
+        <div class="pad-row"><div class="pad-btn" id="btn-left">◀</div><div class="pad-btn" id="btn-down">▼</div><div class="pad-btn" id="btn-right">▶</div></div>
     </div>
-    <div class="pad-btn" id="btn-skill">SKILL</div>
+    <button class="pad-btn" id="btn-skill">SKILL</button>
 </div>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let TILE_SIZE = 50;
-const MAP_SIZE = 12;
+const MAP_SIZE = 15; // 맵 크기를 약간 키워 여유 확보
 
-// 플레이어 정보 (로드 실패 시 기본값)
-let player = {
-    x: 1, y: 1, hp: 100, maxHp: 100, gold: 50, atk: 12,
-    weaponLvl: 0, potions: 3, lastSkill: 0
-};
-
-let gameState = {
-    floor: 1, map: [], monsters: [], items: [],
-    portal: null, isBossClear: false, 
-    theme: { name: "철의 던전", wall: "#444", floor: "#111" }
-};
+let player = { x: 1, y: 1, hp: 100, maxHp: 100, gold: 50, atk: 12, weaponLvl: 0, potions: 3, lastSkill: 0 };
+let gameState = { floor: 1, map: [], monsters: [], items: [], portal: null, isBossClear: false, theme: {} };
 
 const THEMES = [
     { name: "철의 던전", wall: "#444", floor: "#111" },
@@ -91,63 +72,65 @@ const THEMES = [
     { name: "황금의 성채", wall: "#665511", floor: "#1a1604" }
 ];
 
-// 초기 사이즈 조절
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    // 화면 크기에 맞춰 타일 사이즈 조정 (가독성)
-    TILE_SIZE = Math.min(canvas.width, canvas.height) / 8;
-}
-
-function updateTheme() {
-    const idx = Math.floor((gameState.floor - 1) / 5) % THEMES.length;
-    gameState.theme = THEMES[idx];
-    document.getElementById('theme-name').innerText = gameState.theme.name;
+    TILE_SIZE = Math.min(canvas.width, canvas.height) / 10;
 }
 
 function initMap(floor) {
     gameState.floor = floor;
-    updateTheme();
-    gameState.map = Array.from({length: MAP_SIZE}, () => Array(MAP_SIZE).fill(0));
+    const themeIdx = Math.floor((floor - 1) / 5) % THEMES.length;
+    gameState.theme = THEMES[themeIdx];
+    document.getElementById('theme-name').innerText = gameState.theme.name;
+
+    // 1. 기초 맵 생성 (모두 벽으로 채움)
+    gameState.map = Array.from({length: MAP_SIZE}, () => Array(MAP_SIZE).fill(1));
     
-    // 외벽 및 내벽
-    for(let y=0; y<MAP_SIZE; y++) {
-        for(let x=0; x<MAP_SIZE; x++) {
-            if(x===0 || x===MAP_SIZE-1 || y===0 || y===MAP_SIZE-1 || Math.random() < 0.18) {
-                gameState.map[y][x] = 1;
-            }
+    // 2. 랜덤 길 생성 (간단한 터널링)
+    for(let y=1; y<MAP_SIZE-1; y++) {
+        for(let x=1; x<MAP_SIZE-1; x++) {
+            if(Math.random() > 0.25) gameState.map[y][x] = 0;
         }
     }
-    // 시작점과 보스 입구 이동 통로 확보 (모서리 빈 공간 확보)
-    gameState.map[1][1] = 0;
-    gameState.map[1][MAP_SIZE-2] = 0;
-    gameState.map[MAP_SIZE-2][1] = 0;
-    gameState.map[MAP_SIZE-2][MAP_SIZE-2] = 0;
 
+    // 3. [중요] 플레이어 시작 지점 및 주변 안전 확보 (3x3 구역)
+    for(let i=1; i<=3; i++) {
+        for(let j=1; j<=3; j++) {
+            gameState.map[i][j] = 0;
+        }
+    }
+
+    // 4. 엔티티 초기화
+    player.x = 1; player.y = 1;
     gameState.monsters = [];
-    let mCount = 4 + Math.floor(floor/3);
-    for(let i=0; i<mCount; i++) spawnEntity('monster');
-    
     gameState.items = [];
     gameState.portal = null;
     gameState.isBossClear = false;
-    player.x = 1; player.y = 1; // 플레이어 위치 초기화
 
-    document.getElementById('msg').innerText = floor + "층 진입. 몬스터를 소탕하십시오.";
+    let mCount = 5 + Math.floor(floor/3);
+    for(let i=0; i<mCount; i++) spawnEntity('monster');
+
+    document.getElementById('msg').innerText = floor + "층 진입 완료.";
     saveGame();
     updateUI();
 }
 
 function spawnEntity(type) {
     let rx, ry, attempts = 0;
-    while(attempts < 200) {
+    while(attempts < 300) {
         rx = Math.floor(Math.random()*(MAP_SIZE-2))+1;
         ry = Math.floor(Math.random()*(MAP_SIZE-2))+1;
-        if(gameState.map[ry][rx] === 0 && (rx !== player.x || ry !== player.y)) {
+        // 바닥이면서 플레이어 시작 구역이 아닌 곳
+        if(gameState.map[ry][rx] === 0 && (rx > 3 || ry > 3)) {
             if(type === 'monster') {
-                gameState.monsters.push({ x: rx, y: ry, hp: 25+(gameState.floor*7), maxHp: 25+(gameState.floor*7), isBoss: false });
+                gameState.monsters.push({ x: rx, y: ry, hp: 30+(gameState.floor*8), maxHp: 30+(gameState.floor*8), isBoss: false });
             } else if(type === 'boss') {
-                gameState.monsters.push({ x: rx, y: ry, hp: 120+(gameState.floor*25), maxHp: 120+(gameState.floor*25), isBoss: true });
+                // 보스 주변 길 뚫기
+                for(let dy=-1; dy<=1; dy++) {
+                    for(let dx=-1; dx<=1; dx++) gameState.map[ry+dy][rx+dx] = 0;
+                }
+                gameState.monsters.push({ x: rx, y: ry, hp: 150+(gameState.floor*30), maxHp: 150+(gameState.floor*30), isBoss: true });
             }
             return;
         }
@@ -156,107 +139,81 @@ function spawnEntity(type) {
 }
 
 function spawnPortal() {
-    // 플레이어와 가장 먼 모서리에 포탈 생성
-    const corners = [[1, MAP_SIZE-2], [MAP_SIZE-2, 1], [MAP_SIZE-2, MAP_SIZE-2]];
+    const corners = [[MAP_SIZE-2, MAP_SIZE-2], [1, MAP_SIZE-2], [MAP_SIZE-2, 1]];
     const pos = corners[Math.floor(Math.random()*corners.length)];
+    gameState.map[pos[1]][pos[0]] = 0; 
+    // 포탈 주변 뚫기
+    gameState.map[pos[1]-1][pos[0]] = 0; gameState.map[pos[1]][pos[0]-1] = 0;
     gameState.portal = { x: pos[0], y: pos[1] };
-    gameState.map[pos[1]][pos[0]] = 0;
-    document.getElementById('msg').innerText = "보스 처치! 탈출구가 열렸습니다.";
+    document.getElementById('msg').innerText = "출구가 열렸습니다! 모서리로 이동하세요.";
 }
 
 function draw() {
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // 카메라: 플레이어가 항상 중심
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
     const camX = canvas.width/2 - (player.x + 0.5) * TILE_SIZE;
     const camY = canvas.height/2 - (player.y + 0.5) * TILE_SIZE;
 
-    // 맵 렌더링
     for(let y=0; y<MAP_SIZE; y++) {
         for(let x=0; x<MAP_SIZE; x++) {
-            const tx = x*TILE_SIZE + camX;
-            const ty = y*TILE_SIZE + camY;
+            const tx = x*TILE_SIZE + camX, ty = y*TILE_SIZE + camY;
             if(gameState.map[y][x] === 1) {
                 ctx.fillStyle = gameState.theme.wall;
                 ctx.fillRect(tx, ty, TILE_SIZE-1, TILE_SIZE-1);
             } else {
                 ctx.fillStyle = gameState.theme.floor;
                 ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
-                ctx.strokeStyle = "#222";
-                ctx.strokeRect(tx, ty, TILE_SIZE, TILE_SIZE);
+                ctx.strokeStyle = "#222"; ctx.strokeRect(tx, ty, TILE_SIZE, TILE_SIZE);
             }
         }
     }
 
-    // 포탈
     if(gameState.portal) {
-        ctx.fillStyle = "#00ffcc";
-        ctx.shadowBlur = 20; ctx.shadowColor = "#00ffcc";
+        ctx.fillStyle = "#00ffcc"; ctx.shadowBlur = 20; ctx.shadowColor = "#00ffcc";
         ctx.fillRect(gameState.portal.x*TILE_SIZE+camX+5, gameState.portal.y*TILE_SIZE+camY+5, TILE_SIZE-10, TILE_SIZE-10);
         ctx.shadowBlur = 0;
     }
 
-    // 아이템
     gameState.items.forEach(it => {
         ctx.fillStyle = it.type === 'gold' ? 'gold' : '#ff00ff';
-        ctx.beginPath();
-        ctx.arc(it.x*TILE_SIZE+camX+TILE_SIZE/2, it.y*TILE_SIZE+camY+TILE_SIZE/2, TILE_SIZE/5, 0, Math.PI*2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(it.x*TILE_SIZE+camX+TILE_SIZE/2, it.y*TILE_SIZE+camY+TILE_SIZE/2, TILE_SIZE/5, 0, Math.PI*2); ctx.fill();
     });
 
-    // 몬스터
     gameState.monsters.forEach(m => {
-        const mx = m.x*TILE_SIZE+camX;
-        const my = m.y*TILE_SIZE+camY;
+        const mx = m.x*TILE_SIZE+camX, my = m.y*TILE_SIZE+camY;
         ctx.fillStyle = m.isBoss ? '#f0f' : '#f44';
         ctx.fillRect(mx+TILE_SIZE*0.2, my+TILE_SIZE*0.2, TILE_SIZE*0.6, TILE_SIZE*0.6);
-        // HP Bar
         ctx.fillStyle = '#333'; ctx.fillRect(mx+5, my-8, TILE_SIZE-10, 5);
         ctx.fillStyle = '#f00'; ctx.fillRect(mx+5, my-8, (TILE_SIZE-10)*(m.hp/m.maxHp), 5);
     });
 
-    // 플레이어
-    ctx.fillStyle = '#00aaff';
-    ctx.shadowBlur = 15; ctx.shadowColor = '#00aaff';
-    ctx.fillRect(player.x*TILE_SIZE+camX+TILE_SIZE*0.15, player.y*TILE_SIZE+camY+TILE_SIZE*0.15, TILE_SIZE*0.7, TILE_SIZE*0.7);
+    ctx.fillStyle = '#00aaff'; ctx.shadowBlur = 15; ctx.shadowColor = '#00aaff';
+    ctx.fillRect(player.x*TILE_SIZE+camX+TILE_SIZE*0.2, player.y*TILE_SIZE+camY+TILE_SIZE*0.2, TILE_SIZE*0.6, TILE_SIZE*0.6);
     ctx.shadowBlur = 0;
 
-    // 스킬 쿨타임
-    let now = Date.now();
-    let skillProgress = Math.min(100, ((now - player.lastSkill) / 5000) * 100);
+    let skillProgress = Math.min(100, ((Date.now() - player.lastSkill) / 5000) * 100);
     document.getElementById('skill-fill').style.width = skillProgress + "%";
-
     requestAnimationFrame(draw);
 }
 
 function move(dx, dy) {
-    let nx = player.x + dx;
-    let ny = player.y + dy;
+    let nx = player.x + dx, ny = player.y + dy;
     if(nx<0 || nx>=MAP_SIZE || ny<0 || ny>=MAP_SIZE || gameState.map[ny][nx] === 1) return;
 
     let mIdx = gameState.monsters.findIndex(m => m.x === nx && m.y === ny);
     if(mIdx > -1) {
-        let dmg = player.atk + (player.weaponLvl*6);
-        gameState.monsters[mIdx].hp -= dmg;
-        if(gameState.monsters[mIdx].hp <= 0) {
-            let m = gameState.monsters[mIdx];
-            let drops = m.isBoss ? 5 : 1;
-            for(let i=0; i<drops; i++) {
-                gameState.items.push({ x: m.x, y: m.y, type: Math.random()<0.2 ? 'potion':'gold', amount: 15+gameState.floor*3 });
-            }
+        let m = gameState.monsters[mIdx];
+        m.hp -= (player.atk + player.weaponLvl*7);
+        if(m.hp <= 0) {
+            for(let i=0; i<(m.isBoss?6:1); i++) gameState.items.push({ x: m.x, y: m.y, type: Math.random()<0.2?'potion':'gold', amount: 20+gameState.floor*5 });
             if(m.isBoss) { gameState.isBossClear = true; spawnPortal(); }
             gameState.monsters.splice(mIdx, 1);
             if(gameState.monsters.length === 0 && !gameState.isBossClear) spawnEntity('boss');
-        } else {
-            player.hp -= Math.floor(gameState.floor * 1.3);
-        }
+        } else { player.hp -= Math.floor(gameState.floor * 1.5); }
     } else {
         player.x = nx; player.y = ny;
         gameState.items = gameState.items.filter(it => {
             if(it.x === player.x && it.y === player.y) {
-                if(it.type === 'gold') player.gold += it.amount;
-                else player.potions++;
+                if(it.type === 'gold') player.gold += it.amount; else player.potions++;
                 return false;
             }
             return true;
@@ -265,20 +222,16 @@ function move(dx, dy) {
             if(confirm("다음 층으로 가시겠습니까?")) initMap(gameState.floor + 1);
         }
     }
-    if(player.hp <= 0) { alert("사망! 1층부터 다시 시작합니다."); localStorage.clear(); location.reload(); }
+    if(player.hp <= 0) { alert("사망! 재시작합니다."); localStorage.clear(); location.reload(); }
     updateUI();
 }
 
 function castSkill() {
     if(Date.now() - player.lastSkill < 5000) return;
     player.lastSkill = Date.now();
-    document.getElementById('msg').innerText = "푸른 마력 폭발 발생!";
-    gameState.monsters.forEach(m => { m.hp -= (player.atk * 4); });
+    gameState.monsters.forEach(m => m.hp -= (player.atk * 5));
     gameState.monsters = gameState.monsters.filter(m => {
-        if(m.hp <= 0) {
-            if(m.isBoss) { gameState.isBossClear = true; spawnPortal(); }
-            return false;
-        }
+        if(m.hp <= 0) { if(m.isBoss) { gameState.isBossClear = true; spawnPortal(); } return false; }
         return true;
     });
     if(gameState.monsters.length === 0 && !gameState.isBossClear) spawnEntity('boss');
@@ -291,44 +244,30 @@ function updateUI() {
     document.getElementById('maxHp').innerText = player.maxHp;
     document.getElementById('gold').innerText = player.gold;
     document.getElementById('atk').innerText = player.atk;
-    document.getElementById('bonusAtk').innerText = player.weaponLvl * 6;
+    document.getElementById('bonusAtk').innerText = player.weaponLvl * 7;
 }
 
 function toggleModal(type) {
-    const m = document.getElementById('modal');
-    const c = document.getElementById('modal-content');
+    const m = document.getElementById('modal'), c = document.getElementById('modal-content');
     m.style.display = 'block';
     if(type === 'inventory') {
-        c.innerHTML = `<h2 style="color:#00aaff">가방</h2>
-            <div class="item-row">포션: ${player.potions}개 <button class="shop-btn" onclick="usePotion()">마시기</button></div>
-            <div class="item-row">무기: +${player.weaponLvl} 강화됨</div>`;
+        c.innerHTML = `<h2>가방</h2><div class="item-row">포션: ${player.potions}개 <button class="shop-btn" onclick="usePotion()">사용</button></div><div class="item-row">무기 강화: +${player.weaponLvl}</div>`;
     } else {
-        let cost = (player.weaponLvl+1)*70;
-        c.innerHTML = `<h2 style="color:#00aaff">상점</h2>
-            <div class="item-row">포션 (30G) <button class="shop-btn" onclick="buy('p')">구매</button></div>
-            <div class="item-row">강화 (${cost}G) <button class="shop-btn" onclick="buy('u')">강화</button></div>`;
+        let cost = (player.weaponLvl+1)*80;
+        c.innerHTML = `<h2>상점</h2><div class="item-row">포션 (30G) <button class="shop-btn" onclick="buy('p')">구매</button></div><div class="item-row">강화 (${cost}G) <button class="shop-btn" onclick="buy('u')">강화</button></div>`;
     }
 }
 function closeModal() { document.getElementById('modal').style.display = 'none'; }
-function usePotion() {
-    if(player.potions > 0) { player.potions--; player.hp = Math.min(player.maxHp, player.hp+40); updateUI(); toggleModal('inventory'); }
-}
+function usePotion() { if(player.potions > 0) { player.potions--; player.hp = Math.min(player.maxHp, player.hp+50); updateUI(); toggleModal('inventory'); } }
 function buy(t) {
     if(t==='p' && player.gold >= 30) { player.gold -= 30; player.potions++; }
-    else if(t==='u') {
-        let cost = (player.weaponLvl+1)*70;
-        if(player.gold >= cost) { player.gold -= cost; player.weaponLvl++; }
-    }
+    else if(t==='u') { let cost = (player.weaponLvl+1)*80; if(player.gold >= cost) { player.gold -= cost; player.weaponLvl++; } }
     updateUI(); toggleModal('shop');
 }
 
-// 조작
 window.addEventListener('keydown', e => {
-    if(e.key.includes('Arrow')) e.preventDefault();
-    if(e.key === 'ArrowUp') move(0, -1);
-    if(e.key === 'ArrowDown') move(0, 1);
-    if(e.key === 'ArrowLeft') move(-1, 0);
-    if(e.key === 'ArrowRight') move(1, 0);
+    if(e.key === 'ArrowUp') move(0, -1); if(e.key === 'ArrowDown') move(0, 1);
+    if(e.key === 'ArrowLeft') move(-1, 0); if(e.key === 'ArrowRight') move(1, 0);
     if(e.key.toLowerCase() === 'k') castSkill();
 });
 document.getElementById('btn-up').onclick = () => move(0, -1);
@@ -337,23 +276,13 @@ document.getElementById('btn-left').onclick = () => move(-1, 0);
 document.getElementById('btn-right').onclick = () => move(1, 0);
 document.getElementById('btn-skill').onclick = () => castSkill();
 
-function saveGame() { localStorage.setItem('rpg_100f_save', JSON.stringify({player, floor: gameState.floor})); }
+function saveGame() { localStorage.setItem('rpg_fixed_save', JSON.stringify({player, floor: gameState.floor})); }
 function loadGame() {
-    const s = localStorage.getItem('rpg_100f_save');
-    if(s) { 
-        const d = JSON.parse(s); 
-        player = d.player; 
-        initMap(d.floor); 
-    } else {
-        initMap(1);
-    }
+    const s = localStorage.getItem('rpg_fixed_save');
+    if(s) { const d = JSON.parse(s); player = d.player; initMap(d.floor); } else initMap(1);
 }
 
-// 초기화 순서 강제
-resize();
-window.addEventListener('resize', resize);
-loadGame();
-draw(); // 루프 시작
+resize(); window.addEventListener('resize', resize); loadGame(); draw();
 </script>
 </body>
 </html>
