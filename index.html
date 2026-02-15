@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>RPG 테스트 화면</title>
+<style>
+body {
+  margin: 0;
+  background: #111;
+  font-family: sans-serif;
+  color: white;
+}
+#hud {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 60px;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  padding: 10px;
+}
+.bar {
+  height: 20px;
+  margin-right: 10px;
+  border: 1px solid #fff;
+}
+.hp { width: 200px; background: red; }
+.mp { width: 200px; background: blue; }
+.exp { width: 300px; background: green; }
+
+#chat {
+  position: absolute;
+  bottom: 100px; left: 0;
+  width: 300px; height: 200px;
+  background: rgba(0,0,0,0.5);
+  overflow-y: auto;
+  padding: 5px;
+}
+
+#map {
+  position: absolute;
+  top: 60px; bottom: 100px; left: 300px; right: 200px;
+  background: url('https://picsum.photos/800/600?random') center/cover;
+}
+
+#minimap {
+  position: absolute;
+  top: 70px; right: 10px;
+  width: 180px; height: 180px;
+  background: rgba(0,0,0,0.5);
+}
+
+#skillbar {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 100px;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.skill {
+  width: 60px; height: 60px;
+  margin: 10px;
+  background: gray;
+  border: 2px solid #fff;
+  border-radius: 8px;
+}
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="bar hp"></div>
+  <div class="bar mp"></div>
+  <div class="bar exp"></div>
+  <span>Lv.10 전사</span>
+</div>
+
+<div id="chat">
+  <p>[시스템] 게임에 접속했습니다.</p>
+  <p>[파티] 안녕하세요!</p>
+</div>
+
+<div id="map"></div>
+<div id="minimap">미니맵</div>
+
+<div id="skillbar">
+  <div class="skill">⚔️</div>
+  <div class="skill">🔥</div>
+  <div class="skill">❄️</div>
+  <div class="skill">💊</div>
+</div>
+</body>
+</html>
